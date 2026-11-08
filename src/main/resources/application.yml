@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: kb-bot
+  ai:
+    model:
+      chat: ollama
+      embedding: ollama
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        options:
+          model: qwen2.5:7b
+          temperature: 0
+      embedding:
+        options:
+          model: bge-m3
+    vectorstore:
+      chroma:
+        client:
+          host: http://localhost
+          port: 8000
+        collection-name: knowledge-base
+        initialize-schema: true
+
+rag:
+  chunk:
+    max-tokens: 500

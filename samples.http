@@ -1,0 +1,109 @@
+# Mintadokumentumok betöltése. IntelliJ-ben: nyisd meg a fájlt, és futtasd az összes kérést (Run All).
+@host = http://localhost:8080
+
+### Lakáshitel – igénylési feltételek
+POST {{host}}/api/documents
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="product"
+
+LAKASHITEL
+--boundary
+Content-Disposition: form-data; name="file"; filename="lakashitel-igenylesi-feltetelek.md"
+Content-Type: text/markdown
+
+< ./src/main/resources/documents/lakashitel/lakashitel-igenylesi-feltetelek.md
+--boundary--
+
+### Lakáshitel – kondíciós lista
+POST {{host}}/api/documents
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="product"
+
+LAKASHITEL
+--boundary
+Content-Disposition: form-data; name="file"; filename="lakashitel-kondiciok.md"
+Content-Type: text/markdown
+
+< ./src/main/resources/documents/lakashitel/lakashitel-kondiciok.md
+--boundary--
+
+### Személyi kölcsön – termékleírás
+POST {{host}}/api/documents
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="product"
+
+SZEMELYI_KOLCSON
+--boundary
+Content-Disposition: form-data; name="file"; filename="szemelyi-kolcson-termekleiras.md"
+Content-Type: text/markdown
+
+< ./src/main/resources/documents/szemelyi-kolcson/szemelyi-kolcson-termekleiras.md
+--boundary--
+
+### Személyi kölcsön – GYIK
+POST {{host}}/api/documents
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="product"
+
+SZEMELYI_KOLCSON
+--boundary
+Content-Disposition: form-data; name="file"; filename="szemelyi-kolcson-gyik.md"
+Content-Type: text/markdown
+
+< ./src/main/resources/documents/szemelyi-kolcson/szemelyi-kolcson-gyik.md
+--boundary--
+
+### Bankszámla – számlacsomagok
+POST {{host}}/api/documents
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="product"
+
+BANKSZAMLA
+--boundary
+Content-Disposition: form-data; name="file"; filename="bankszamla-csomagok.md"
+Content-Type: text/markdown
+
+< ./src/main/resources/documents/bankszamla/bankszamla-csomagok.md
+--boundary--
+
+### Bankszámla – számlanyitás
+POST {{host}}/api/documents
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="product"
+
+BANKSZAMLA
+--boundary
+Content-Disposition: form-data; name="file"; filename="bankszamla-nyitas.md"
+Content-Type: text/markdown
+
+< ./src/main/resources/documents/bankszamla/bankszamla-nyitas.md
+--boundary--
+
+# --- Hibás eset: rossz termékkel feltöltve -> 400 Bad Request
+### HIBÁS: bankszámla-anyag lakáshitelként
+POST {{host}}/api/documents
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="product"
+
+LAKASHITEL
+--boundary
+Content-Disposition: form-data; name="file"; filename="bankszamla-csomagok.md"
+Content-Type: text/markdown
+
+< ./src/main/resources/documents/bankszamla/bankszamla-csomagok.md
+--boundary--
+
