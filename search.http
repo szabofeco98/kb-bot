@@ -1,0 +1,27 @@
+# Retrieval test questions. Load the documents first with samples.http, then compare the scores in the app log.
+@host = http://localhost:8080
+
+### Folyósítási díj – lakáshitel (kondíciós lista / Díjak expected)
+GET {{host}}/api/search?question=Mennyi%20a%20foly%C3%B3s%C3%ADt%C3%A1si%20d%C3%ADj%3F&product=LAKASHITEL
+
+### Folyósítási díj – személyi kölcsön (only personal-loan chunks expected)
+GET {{host}}/api/search?question=Mennyi%20a%20foly%C3%B3s%C3%ADt%C3%A1si%20d%C3%ADj%3F&product=SZEMELYI_KOLCSON
+
+### Folyósítási díj – no product filter (both products may appear)
+GET {{host}}/api/search?question=Mennyi%20a%20foly%C3%B3s%C3%ADt%C3%A1si%20d%C3%ADj%3F
+
+### Plusz számla havi díja (table chunk with header expected)
+GET {{host}}/api/search?question=Mennyi%20a%20Plusz%20sz%C3%A1mla%20havi%20d%C3%ADja%3F&product=BANKSZAMLA
+
+### CSOK – not in any document -> NO_RELEVANT_SOURCE expected (after calibration)
+GET {{host}}/api/search?question=Mennyi%20a%20CSOK%20%C3%B6sszege%3F&product=LAKASHITEL
+
+### Hitelkártya kamata – not in any document -> NO_RELEVANT_SOURCE expected (after calibration)
+GET {{host}}/api/search?question=Mennyi%20a%20hitelk%C3%A1rtya%20kamata%3F
+
+# --- Invalid cases -> 400
+### Unknown product
+GET {{host}}/api/search?question=Mennyi%20a%20kamat%3F&product=AUTOHITEL
+
+### Missing question
+GET {{host}}/api/search?product=LAKASHITEL

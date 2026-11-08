@@ -12,7 +12,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Locale;
 
 @RestController
 @RequestMapping("/api/documents")
@@ -26,17 +25,9 @@ public class DocumentController {
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    public IngestionResult upload(@RequestParam("file") MultipartFile file,
+    public IngestionResult upload(@RequestParam("file") @MarkdownFile MultipartFile file,
                                   @RequestParam("product") Product product) throws IOException {
-        if (file.isEmpty()) {
-            throw new InvalidDocumentException("The uploaded file is empty.");
-        }
-        String fileName = file.getOriginalFilename();
-        if (fileName == null || !fileName.toLowerCase(Locale.ROOT).endsWith(".md")) {
-            throw new InvalidDocumentException("Only Markdown (.md) files can be uploaded. "
-                    + "Other formats (PDF, Word) must be converted to Markdown first.");
-        }
         String content = new String(file.getBytes(), StandardCharsets.UTF_8);
-        return ingestionService.ingest(fileName, content, product);
+        return ingestionService.ingest(file.getOriginalFilename(), content, product);
     }
 }

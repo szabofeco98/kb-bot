@@ -25,3 +25,6 @@ spring:
 rag:
   chunk:
     max-tokens: 500
+  top-k: 5
+  # Placeholder: embedding-model specific, calibrate on test questions (scores are logged per search).
+  similarity-threshold: 0.5
