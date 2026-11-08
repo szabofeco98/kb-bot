@@ -1,101 +1,91 @@
 package com.szabofeco.kb_bot.ask;
 
 import com.szabofeco.kb_bot.common.Product;
+import com.szabofeco.kb_bot.search.SearchService;
+import com.szabofeco.kb_bot.search.SourceDocument;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 /**
- * Retrieval: embeds the question (inside the {@link VectorStore}, with the same embedding model as ingestion),
- * runs a similarity search optionally filtered by product, and applies a relevance threshold.
+ * Fixed RAG pipeline: retrieval → relevance gate → grounded generation → citations built in code.
+ * Every path that cannot be backed by a cited source ends in {@link AskStatus#NO_RELEVANT_SOURCE}.
  */
 @Service
 public class AskService {
 
     private static final Logger log = LoggerFactory.getLogger(AskService.class);
 
-    private final VectorStore vectorStore;
-    private final int topK;
-    private final double similarityThreshold;
-    private final FilterExpressionBuilder filterBuilder = new FilterExpressionBuilder();
+    private final SearchService searchService;
+    private final AnswerGenerator answerGenerator;
 
-    public AskService(VectorStore vectorStore,
-                      @Value("${rag.top-k:5}") int topK,
-                      @Value("${rag.similarity-threshold:0.6}") double similarityThreshold) {
-        this.vectorStore = vectorStore;
-        this.topK = topK;
-        this.similarityThreshold = similarityThreshold;
+    public AskService(SearchService searchService, AnswerGenerator answerGenerator) {
+        this.searchService = searchService;
+        this.answerGenerator = answerGenerator;
     }
 
-    /** Input is validated at the API boundary ({@link AskController}); here it is only normalised. */
     public AskResponse ask(String question, Product product) {
-        String trimmed = question.strip();
-
-        SearchRequest.Builder request = SearchRequest.builder()
-                .query(trimmed)
-                .topK(topK)
-                .similarityThresholdAll();
-        if (product != null) {
-            request.filterExpression(filterBuilder.eq("product", product.name()).build());
+        List<Document> chunks = searchService.retrieveRelevant(question, product);
+        if (chunks.isEmpty()) {
+            // Nothing relevant enough: the LLM is not called at all.
+            audit(question, product, chunks, null, List.of(), List.of(), AskStatus.NO_RELEVANT_SOURCE);
+            return AskResponse.noRelevantSource(product);
         }
-        List<Document> hits = vectorStore.similaritySearch(request.build());
 
-        List<Document> relevant = hits.stream()
-                .filter(d -> score(d) >= similarityThreshold)
-                .sorted(Comparator.comparingDouble(AskService::score).reversed())
-                .toList();
-        List<SourceDocument> documents = groupByDocument(relevant);
-        AskStatus status = documents.isEmpty() ? AskStatus.NO_RELEVANT_SOURCE : AskStatus.SOURCES_FOUND;
+        GeneratedAnswer generated = answerGenerator.generate(question, chunks);
 
-        log.info("Search: question=\"{}\", product={}, threshold={}, status={}, hits=[{}]",
-                trimmed, product == null ? "ALL" : product, similarityThreshold, status,
-                hits.stream()
-                        .map(d -> String.format("%s/%s/%s=%.3f", meta(d, "docId"), meta(d, "section"),
-                                d.getId(), score(d)))
-                        .collect(Collectors.joining(", ")));
-
-        return new AskResponse(status, product, documents);
-    }
-
-    private static double score(Document document) {
-        return document.getScore() == null ? 0.0 : document.getScore();
-    }
-
-    private static String meta(Document document, String key) {
-        Object value = document.getMetadata().get(key);
-        return value == null ? null : value.toString();
-    }
-
-    /**
-     * Groups chunks (already sorted best first) by docId. Insertion order is kept, so documents end up ordered by
-     * their best chunk, and chunks within a document stay best first.
-     */
-    private static List<SourceDocument> groupByDocument(List<Document> sortedChunks) {
-        Map<String, List<Document>> byDocId = new LinkedHashMap<>();
-        for (Document chunk : sortedChunks) {
-            byDocId.computeIfAbsent(meta(chunk, "docId"), k -> new ArrayList<>()).add(chunk);
+        // Citations: map the labels the model used back to the chunks it was given. Labels that were not in the
+        // context are dropped – the model cannot cite anything we did not retrieve.
+        Map<String, Document> byLabel = new LinkedHashMap<>();
+        for (int i = 0; i < chunks.size(); i++) {
+            byLabel.put(AnswerGenerator.label(i), chunks.get(i));
         }
-        return byDocId.values().stream()
-                .map(chunks -> {
-                    Document best = chunks.get(0);
-                    return new SourceDocument(meta(best, "docId"), meta(best, "title"), meta(best, "version"),
-                            meta(best, "effectiveFrom"), meta(best, "product"), meta(best, "sourceFile"),
-                            score(best), chunks.stream()
-                                    .map(c -> new SourceChunk(c.getId(), meta(c, "section"), score(c), c.getText()))
-                                    .toList());
-                })
+        List<String> cited = new ArrayList<>();
+        List<String> dropped = new ArrayList<>();
+        List<String> usedSources = generated.usedSources() == null ? List.of() : generated.usedSources();
+        for (String raw : usedSources) {
+            String label = raw == null ? "" : raw.replaceAll("[\\[\\]\\s]", "").toUpperCase(Locale.ROOT);
+            if (byLabel.containsKey(label)) {
+                if (!cited.contains(label)) {
+                    cited.add(label);
+                }
+            } else {
+                dropped.add(raw);
+            }
+        }
+
+        boolean hasAnswer = generated.answerable() && generated.answer() != null && !generated.answer().isBlank();
+        if (!hasAnswer || cited.isEmpty()) {
+            // Not answerable, or an answer without any valid source: fail closed, nothing uncited goes out.
+            audit(question, product, chunks, generated, cited, dropped, AskStatus.NO_RELEVANT_SOURCE);
+            return AskResponse.noRelevantSource(product);
+        }
+
+        // Keep the retrieval order (best first): sources are ordered by relevance, not by citation order.
+        List<Document> citedChunks = byLabel.entrySet().stream()
+                .filter(e -> cited.contains(e.getKey()))
+                .map(Map.Entry::getValue)
                 .toList();
+        audit(question, product, chunks, generated, cited, dropped, AskStatus.ANSWERED);
+        return new AskResponse(AskStatus.ANSWERED, generated.answer().strip(), product,
+                SourceDocument.fromChunks(citedChunks));
+    }
+
+    private static void audit(String question, Product product, List<Document> chunks, GeneratedAnswer generated,
+                              List<String> cited, List<String> dropped, AskStatus status) {
+        List<String> context = new ArrayList<>();
+        for (int i = 0; i < chunks.size(); i++) {
+            context.add(AnswerGenerator.label(i) + "=" + chunks.get(i).getId());
+        }
+        log.info("Ask: question=\"{}\", product={}, context={}, answerable={}, cited={}, dropped={}, status={}",
+                question.strip(), product == null ? "ALL" : product, context,
+                generated == null ? "-" : generated.answerable(), cited, dropped, status);
     }
 }

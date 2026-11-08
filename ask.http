@@ -1,0 +1,58 @@
+# Generated answers. Load the documents first with samples.http. The audit log shows context labels, citations and
+# which gate fired (threshold vs. answerable=false).
+@host = http://localhost:8080
+
+### Folyósítási díj – lakáshitel (expected: 1%, max 100 000 Ft, cites the kondíciós lista)
+POST {{host}}/api/ask
+Content-Type: application/json
+
+{ "question": "Mennyi a folyósítási díj?", "product": "LAKASHITEL" }
+
+### Folyósítási díj – személyi kölcsön (expected: free, cites the personal-loan doc)
+POST {{host}}/api/ask
+Content-Type: application/json
+
+{ "question": "Mennyi a folyósítási díj?", "product": "SZEMELYI_KOLCSON" }
+
+### Folyósítási díj – no product (sources may come from both products)
+POST {{host}}/api/ask
+Content-Type: application/json
+
+{ "question": "Mennyi a folyósítási díj?" }
+
+### Kamatperiódusok – no product (expected: paragraph pointed with the exact product)
+POST {{host}}/api/ask
+Content-Type: application/json
+
+{ "question": "Milyen kamatperiódusok elérhetőek?" }
+
+### Plusz számla havi díja (expected: value from the package table)
+POST {{host}}/api/ask
+Content-Type: application/json
+
+{ "question": "Mennyi a Plusz számla havi díja?", "product": "BANKSZAMLA" }
+
+### CSOK – not in any document -> NO_RELEVANT_SOURCE
+POST {{host}}/api/ask
+Content-Type: application/json
+
+{ "question": "Mennyi a CSOK összege?", "product": "LAKASHITEL" }
+
+### Hitelkártya kamata – not in any document -> NO_RELEVANT_SOURCE
+POST {{host}}/api/ask
+Content-Type: application/json
+
+{ "question": "Mennyi a hitelkártya kamata?" }
+
+# --- Invalid cases -> 400
+### Blank question
+POST {{host}}/api/ask
+Content-Type: application/json
+
+{ "question": "  ", "product": "LAKASHITEL" }
+
+### Unknown product
+POST {{host}}/api/ask
+Content-Type: application/json
+
+{ "question": "Mennyi a kamat?", "product": "AUTOHITEL" }

@@ -2,8 +2,8 @@
 id: SZK-001
 title: Személyi kölcsön – Termékleírás és kondíciók
 product: SZEMELYI_KOLCSON
-version: 2026-10
-effective_from: 2026-10-01
+version: 2026-11
+effective_from: 2026-11-01
 owner: Lakossági hitelezés
 ---
 
@@ -27,14 +27,25 @@ Szabad felhasználású, fedezet nélküli, forintban folyósított kölcsön. I
 - Hitelösszeg: 300 000 Ft – 10 000 000 Ft
 - Futamidő: 12–96 hónap
 
+## Kamatperiódusok
+
+A személyi kölcsön kétféle kamatozással igényelhető:
+
+- **Végig fix:** az ügyleti kamat a teljes futamidő alatt változatlan. 12–96 hónapos futamidőre választható.
+- **1 éves kamatperiódus:** az ügyleti kamat évente, a kamatperiódus fordulónapján módosulhat. Az új kamat a 12 havi BUBOR és a szerződésben rögzített kamatfelár összege. A kamatfelár a teljes futamidő alatt változatlan. Csak 36 hónapnál hosszabb futamidőre választható.
+
+A kamatozás módja a szerződéskötés után nem módosítható.
+
 ## Kamatok
 
-| Hitelösszeg | Ügyleti kamat (évi, fix) | THM-tól |
-|---|---|---|
-| 300 000 – 2 999 999 Ft | 13,99% | 14,92% |
-| 3 000 000 – 10 000 000 Ft | 11,49% | 12,10% |
+| Kamatperiódus | Hitelösszeg | Ügyleti kamat (évi) | THM-tól |
+|---|---|---|---|
+| Végig fix | 300 000 – 2 999 999 Ft | 13,99% | 14,92% |
+| Végig fix | 3 000 000 – 10 000 000 Ft | 11,49% | 12,10% |
+| 1 éves kamatperiódus | 300 000 – 2 999 999 Ft | 12,49% | 13,31% |
+| 1 éves kamatperiódus | 3 000 000 – 10 000 000 Ft | 10,49% | 11,05% |
 
-A kamat a teljes futamidő alatt fix.
+Az 1 éves kamatperiódus kezdő kamata a 2026. októberi 12 havi BUBOR alapján került meghatározásra.
 
 ## Díjak
 

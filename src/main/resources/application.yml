@@ -8,12 +8,11 @@ spring:
     ollama:
       base-url: http://localhost:11434
       chat:
-        options:
-          model: qwen2.5:7b
-          temperature: 0
+        model: qwen2.5:7b
+        temperature: 0
+        num-ctx: 16384
       embedding:
-        options:
-          model: bge-m3
+        model: bge-m3
     vectorstore:
       chroma:
         client:

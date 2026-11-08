@@ -1,97 +1,131 @@
 package com.szabofeco.kb_bot.ask;
 
 import com.szabofeco.kb_bot.common.Product;
+import com.szabofeco.kb_bot.search.SearchService;
+import com.szabofeco.kb_bot.search.SourceChunk;
+import com.szabofeco.kb_bot.search.SourceDocument;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class AskServiceTest {
 
-    private final VectorStore vectorStore = mock(VectorStore.class);
-    private final AskService service = new AskService(vectorStore, 5, 0.5);
+    private static final String QUESTION = "Mennyi a folyósítási díj?";
 
-    private static Document hit(String id, String docId, String section, double score) {
+    private final SearchService searchService = mock(SearchService.class);
+    private final AnswerGenerator answerGenerator = mock(AnswerGenerator.class);
+    private final AskService service = new AskService(searchService, answerGenerator);
+
+    private static Document chunk(String id, String docId, String section, double score) {
         return Document.builder()
                 .id(id)
                 .text("[" + section + "] text of " + id)
                 .metadata(Map.of("product", "LAKASHITEL", "docId", docId, "title", "Title of " + docId,
-                        "version", "2026-10", "section", section, "effectiveFrom", "2026-10-01",
-                        "sourceFile", docId + ".md"))
+                        "version", "2026-10", "section", section, "sourceFile", docId + ".md"))
                 .score(score)
                 .build();
     }
 
-    private SearchRequest capturedRequest() {
-        ArgumentCaptor<SearchRequest> captor = ArgumentCaptor.forClass(SearchRequest.class);
-        verify(vectorStore).similaritySearch(captor.capture());
-        return captor.getValue();
+    // S1 = c1 (LH-002), S2 = c2 (LH-001), S3 = c3 (LH-002) – already sorted best first, as SearchService returns them
+    private final List<Document> retrieved = List.of(
+            chunk("c1", "LH-002", "Díjak", 0.9),
+            chunk("c2", "LH-001", "Feltételek", 0.8),
+            chunk("c3", "LH-002", "Kamatok", 0.7));
+
+    private void retrieves(List<Document> chunks) {
+        when(searchService.retrieveRelevant(QUESTION, Product.LAKASHITEL)).thenReturn(chunks);
+    }
+
+    private void modelReturns(GeneratedAnswer answer) {
+        when(answerGenerator.generate(anyString(), anyList())).thenReturn(answer);
     }
 
     @Test
-    void productFilterAndTopKArePassedToTheStore() {
-        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
+    void noRelevantChunksMeansNoLlmCall() {
+        retrieves(List.of());
 
-        service.ask("  Mennyi a folyósítási díj?  ", Product.LAKASHITEL);
+        AskResponse response = service.ask(QUESTION, Product.LAKASHITEL);
 
-        SearchRequest request = capturedRequest();
-        assertThat(request.getQuery()).isEqualTo("Mennyi a folyósítási díj?");
-        assertThat(request.getTopK()).isEqualTo(5);
-        assertThat(request.getSimilarityThreshold()).isEqualTo(SearchRequest.SIMILARITY_THRESHOLD_ACCEPT_ALL);
-        assertThat(request.getFilterExpression())
-                .isEqualTo(new FilterExpressionBuilder().eq("product", "LAKASHITEL").build());
+        assertThat(response).isEqualTo(AskResponse.noRelevantSource(Product.LAKASHITEL));
+        verifyNoInteractions(answerGenerator);
     }
 
     @Test
-    void withoutProductAllProductsAreSearched() {
-        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of());
+    void notAnswerableMeansNoRelevantSource() {
+        retrieves(retrieved);
+        modelReturns(new GeneratedAnswer(false, "", List.of()));
 
-        service.ask("Mennyi a folyósítási díj?", null);
-
-        assertThat(capturedRequest().getFilterExpression()).isNull();
-    }
-
-    @Test
-    void allHitsBelowThresholdMeansNoRelevantSource() {
-        when(vectorStore.similaritySearch(any(SearchRequest.class)))
-                .thenReturn(List.of(hit("c1", "LH-002", "Díjak", 0.31), hit("c2", "LH-001", "Feltételek", 0.2)));
-
-        AskResponse response = service.ask("Mennyi a CSOK összege?", Product.LAKASHITEL);
+        AskResponse response = service.ask(QUESTION, Product.LAKASHITEL);
 
         assertThat(response.status()).isEqualTo(AskStatus.NO_RELEVANT_SOURCE);
-        assertThat(response.documents()).isEmpty();
-        assertThat(response.product()).isEqualTo(Product.LAKASHITEL);
+        assertThat(response.answer()).isNull();
+        assertThat(response.sources()).isEmpty();
     }
 
     @Test
-    void relevantChunksAreGroupedByDocumentBestFirst() {
-        when(vectorStore.similaritySearch(any(SearchRequest.class))).thenReturn(List.of(
-                hit("c1", "LH-001", "Feltételek", 0.55),
-                hit("c2", "LH-002", "Díjak", 0.2),       // below threshold – dropped
-                hit("c3", "LH-002", "Díjak", 0.82),
-                hit("c4", "LH-002", "Kamatok", 0.6)));
+    void answerReturnsOnlyCitedChunksGroupedByDocument() {
+        retrieves(retrieved);
+        modelReturns(new GeneratedAnswer(true, " A folyósítási díj 1%, maximum 100 000 Ft. ", List.of("S3", "S1")));
 
-        AskResponse response = service.ask("Mennyi a folyósítási díj?", Product.LAKASHITEL);
+        AskResponse response = service.ask(QUESTION, Product.LAKASHITEL);
 
-        assertThat(response.status()).isEqualTo(AskStatus.SOURCES_FOUND);
-        assertThat(response.documents()).extracting(SourceDocument::docId).containsExactly("LH-002", "LH-001");
+        assertThat(response.status()).isEqualTo(AskStatus.ANSWERED);
+        assertThat(response.answer()).isEqualTo("A folyósítási díj 1%, maximum 100 000 Ft.");
+        assertThat(response.product()).isEqualTo(Product.LAKASHITEL);
+        // S2 (LH-001) was not cited, so it is not a source. Chunks keep retrieval order, not citation order.
+        assertThat(response.sources()).extracting(SourceDocument::docId).containsExactly("LH-002");
+        assertThat(response.sources().get(0).chunks()).extracting(SourceChunk::chunkId)
+                .containsExactly("c1", "c3");
+        verify(answerGenerator).generate(QUESTION, retrieved);
+    }
 
-        SourceDocument best = response.documents().get(0);
-        assertThat(best).isEqualTo(new SourceDocument("LH-002", "Title of LH-002", "2026-10", "2026-10-01",
-                "LAKASHITEL", "LH-002.md", 0.82, List.of(
-                        new SourceChunk("c3", "Díjak", 0.82, "[Díjak] text of c3"),
-                        new SourceChunk("c4", "Kamatok", 0.6, "[Kamatok] text of c4"))));
-        assertThat(response.documents().get(1).chunks()).extracting(SourceChunk::chunkId).containsExactly("c1");
+    @Test
+    void labelsAreNormalisedAndUnknownOnesDropped() {
+        retrieves(retrieved);
+        modelReturns(new GeneratedAnswer(true, "Answer.", List.of("[s2]", "S9", "c1")));
+
+        AskResponse response = service.ask(QUESTION, Product.LAKASHITEL);
+
+        assertThat(response.status()).isEqualTo(AskStatus.ANSWERED);
+        assertThat(response.sources()).extracting(SourceDocument::docId).containsExactly("LH-001");
+    }
+
+    @Test
+    void answerWithoutAnyValidSourceIsNotReturned() {
+        retrieves(retrieved);
+        modelReturns(new GeneratedAnswer(true, "Answer from nowhere.", List.of("S7")));
+
+        AskResponse response = service.ask(QUESTION, Product.LAKASHITEL);
+
+        assertThat(response).isEqualTo(AskResponse.noRelevantSource(Product.LAKASHITEL));
+    }
+
+    @Test
+    void answerWithNullSourcesIsNotReturned() {
+        retrieves(retrieved);
+        modelReturns(new GeneratedAnswer(true, "Answer.", null));
+
+        assertThat(service.ask(QUESTION, Product.LAKASHITEL).status()).isEqualTo(AskStatus.NO_RELEVANT_SOURCE);
+    }
+
+    @Test
+    void searchWithoutProductIsPassedThrough() {
+        when(searchService.retrieveRelevant(any(), any())).thenReturn(List.of());
+
+        AskResponse response = service.ask(QUESTION, null);
+
+        verify(searchService).retrieveRelevant(QUESTION, null);
+        assertThat(response.product()).isNull();
     }
 }
