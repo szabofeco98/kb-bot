@@ -5,12 +5,8 @@ import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import java.util.List;
 
 /**
- * Structured output of the model. The {@link JsonPropertyDescription}s end up in the JSON schema that Spring AI
- * sends as format instructions, so they steer the model field by field (a second place besides the system prompt).
- *
- * @param answerable  {@code false} if the excerpts do not contain the answer
- * @param answer      the answer text (ignored when not answerable)
- * @param usedSources labels of the excerpts the answer is based on, e.g. {@code ["S1", "S3"]}
+ * Structured output of the model. The {@link JsonPropertyDescription}s go into the JSON schema of the format
+ * instructions, so they steer the model alongside the system prompt.
  */
 public record GeneratedAnswer(
         @JsonPropertyDescription("false if the excerpts do not contain the answer")
@@ -22,4 +18,12 @@ public record GeneratedAnswer(
 
         @JsonPropertyDescription("Labels of the excerpts the answer is based on, e.g. [\"S1\", \"S3\"]")
         List<String> usedSources) {
+
+    boolean hasAnswer() {
+        return answerable && answer != null && !answer.isBlank();
+    }
+
+    String text() {
+        return answer.strip();
+    }
 }

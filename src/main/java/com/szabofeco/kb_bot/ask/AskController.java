@@ -6,10 +6,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Generated answer + the documents it is based on. POST (unlike {@code GET /api/search}): the question stays out
- * of URLs and access logs, intermediaries won't retry a paid LLM call, and the body can grow (e.g. history).
- */
+/** POST, not GET: the question stays out of URLs/access logs and intermediaries won't retry a paid LLM call. */
 @RestController
 @RequestMapping("/api/ask")
 public class AskController {

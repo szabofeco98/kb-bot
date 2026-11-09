@@ -9,7 +9,6 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 		+ "org.springframework.ai.vectorstore.chroma.autoconfigure.ChromaVectorStoreAutoConfiguration")
 class KbBotApplicationTests {
 
-	// The Chroma auto-config is disabled, so we mock the VectorStore to let the context start up.
 	@MockitoBean
 	VectorStore vectorStore;
 

@@ -1,8 +1,18 @@
 package com.szabofeco.kb_bot.ingestion;
 
-/** The uploaded document does not satisfy the ingestion rules (results in a 400 response). */
-public class InvalidDocumentException extends RuntimeException {
+import org.jspecify.annotations.Nullable;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ProblemDetail;
+import org.springframework.web.ErrorResponseException;
+
+public class InvalidDocumentException extends ErrorResponseException {
+
     public InvalidDocumentException(String message) {
-        super(message);
+        super(HttpStatus.BAD_REQUEST, ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, message), null);
+    }
+
+    @Override
+    public @Nullable String getMessage() {
+        return getBody().getDetail();
     }
 }

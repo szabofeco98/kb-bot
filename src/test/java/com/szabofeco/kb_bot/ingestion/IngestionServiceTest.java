@@ -18,10 +18,6 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
-/**
- * {@link MarkdownChunker} is used as the real implementation here (it has no side effects);
- * only the {@link VectorStore} is mocked.
- */
 class IngestionServiceTest {
 
     private final VectorStore vectorStore = mock(VectorStore.class);

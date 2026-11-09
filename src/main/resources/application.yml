@@ -21,9 +21,5 @@ spring:
         collection-name: knowledge-base
         initialize-schema: true
 
-rag:
-  chunk:
-    max-tokens: 500
-  top-k: 5
-  # Placeholder: embedding-model specific, calibrate on test questions (scores are logged per search).
-  similarity-threshold: 0.5
+# rag.top-k, rag.similarity-threshold, rag.chunk.max-tokens: defaults and validation live in RagProperties.
+# Override here (or per profile) only when deviating from them, e.g. after threshold calibration.

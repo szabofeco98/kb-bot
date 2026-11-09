@@ -44,7 +44,7 @@ Content-Type: application/json
 
 { "question": "Mennyi a hitelkártya kamata?" }
 
-# --- Invalid cases -> 400
+### --- Invalid cases -> 400
 ### Blank question
 POST {{host}}/api/ask
 Content-Type: application/json

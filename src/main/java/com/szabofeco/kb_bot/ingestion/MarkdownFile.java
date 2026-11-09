@@ -9,10 +9,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/**
- * The uploaded file must be a non-empty Markdown ({@code .md}) file. Markdown is the normalised input format:
- * PDF/Word/Confluence content has to be converted first (e.g. with Docling).
- */
 @Documented
 @Constraint(validatedBy = MarkdownFileValidator.class)
 @Target({ElementType.PARAMETER, ElementType.FIELD})

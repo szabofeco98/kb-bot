@@ -50,31 +50,6 @@ class MarkdownChunkerTest {
     }
 
     @Test
-    void splitsOversizedH2SectionByH3Subsections() {
-        MarkdownChunker chunker = new MarkdownChunker(10);
-        String markdown = """
-                # Doc Title
-                ## Big Section
-                ### Sub One
-                AAAAAAAAAAAAAAAAAAAA
-                ### Sub Two
-                BBBBBBBBBBBBBBBBBBBB
-                """;
-
-        List<Chunk> chunks = chunker.chunk("Doc Title", markdown);
-
-        assertThat(chunks).hasSize(2);
-        assertThat(chunks.get(0).section()).isEqualTo("Big Section > Sub One");
-        assertThat(chunks.get(0).text())
-                .startsWith("[Doc Title > Big Section > Sub One]")
-                .contains("AAAAAAAAAAAAAAAAAAAA");
-        assertThat(chunks.get(1).section()).isEqualTo("Big Section > Sub Two");
-        assertThat(chunks.get(1).text())
-                .startsWith("[Doc Title > Big Section > Sub Two]")
-                .contains("BBBBBBBBBBBBBBBBBBBB");
-    }
-
-    @Test
     void keepsSmallTableWhole() {
         MarkdownChunker chunker = new MarkdownChunker(500);
         String markdown = """
@@ -95,33 +70,49 @@ class MarkdownChunkerTest {
     }
 
     @Test
-    void splitsOversizedTableByRowsAndRepeatsHeaderInEveryPart() {
-        MarkdownChunker chunker = new MarkdownChunker(8);
+    void textBeforeTheFirstSectionGetsTheTitleOnlyBreadcrumb() {
+        MarkdownChunker chunker = new MarkdownChunker(500);
         String markdown = """
                 # Doc Title
-                ## Big Table
-                | A | B |
-                | - | - |
-                | 1 | 2 |
-                | 3 | 4 |
-                | 5 | 6 |
-                | 7 | 8 |
+                Intro text.
+
+                ## Heading One
+                Content one.
                 """;
 
         List<Chunk> chunks = chunker.chunk("Doc Title", markdown);
 
-        assertThat(chunks).hasSizeGreaterThan(1);
-        for (Chunk chunk : chunks) {
-            assertThat(chunk.section()).isEqualTo("Big Table");
-            assertThat(chunk.text()).contains("| A | B |").contains("| - | - |");
-        }
+        assertThat(chunks).hasSize(2);
+        assertThat(chunks.getFirst().section()).isEmpty();
+        assertThat(chunks.getFirst().text()).startsWith("[Doc Title]").contains("Intro text.");
+    }
 
-        String allChunkText = chunks.stream().map(Chunk::text).reduce("", String::concat);
-        assertThat(allChunkText)
-                .contains("| 1 | 2 |").contains("| 3 | 4 |")
-                .contains("| 5 | 6 |").contains("| 7 | 8 |");
-        assertThat(countOccurrences(allChunkText, "| 1 | 2 |")).isEqualTo(1);
-        assertThat(countOccurrences(allChunkText, "| 7 | 8 |")).isEqualTo(1);
+    @Test
+    void splitsOversizedSectionAtBlankLinesAndKeepsTheTableWhole() {
+        MarkdownChunker chunker = new MarkdownChunker(10);
+        String markdown = """
+                # Doc Title
+                ## Big Section
+                AAAAAAAAAAAAAAAAAAAA
+
+                | A | B |
+                | - | - |
+                | 1 | 2 |
+                | 3 | 4 |
+
+                BBBBBBBBBBBBBBBBBBBB
+                """;
+
+        List<Chunk> chunks = chunker.chunk("Doc Title", markdown);
+
+        assertThat(chunks).hasSize(3);
+        for (Chunk chunk : chunks) {
+            assertThat(chunk.section()).isEqualTo("Big Section");
+            assertThat(chunk.text()).startsWith("[Doc Title > Big Section]");
+        }
+        assertThat(chunks.get(0).text()).contains("AAAAAAAAAAAAAAAAAAAA");
+        assertThat(chunks.get(1).text()).contains("| A | B |", "| 1 | 2 |", "| 3 | 4 |");
+        assertThat(chunks.get(2).text()).contains("BBBBBBBBBBBBBBBBBBBB");
     }
 
     private static int countOccurrences(String text, String needle) {

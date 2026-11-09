@@ -3,15 +3,12 @@ package com.szabofeco.kb_bot.ingestion;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/**
- * Splits a Markdown file into frontmatter (simple "key: value" lines between --- markers) and body.
- * Intentionally not a full YAML parser: the metadata is a flat key-value list.
- */
-public record ParsedMarkdown(Map<String, String> frontMatter, String body) {
+/** Flat "key: value" frontmatter + body. Intentionally not a full YAML parser. */
+record ParsedMarkdown(Map<String, String> frontMatter, String body) {
 
-    public static ParsedMarkdown parse(String content) {
+    static ParsedMarkdown parse(String content) {
         String text = content.replace("\r\n", "\n");
-        if (text.startsWith("﻿")) {
+        if (text.startsWith("\uFEFF")) {
             text = text.substring(1);
         }
         if (!text.startsWith("---\n")) {

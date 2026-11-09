@@ -9,25 +9,20 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Retrieval only: returns the relevant source documents for a question, without calling the LLM. GET, because it is
- * a safe, idempotent read. Used for threshold calibration and to measure retrieval separately from generation;
- * the generated answer is {@code POST /api/ask} (package {@code ask}, which builds on {@link SearchService}).
- */
+/** Retrieval only, no LLM: for threshold calibration and measuring retrieval separately from generation. */
 @RestController
 @RequestMapping("/api/search")
 public class SearchController {
 
     private final SearchService searchService;
 
-    public SearchController(SearchService searchService) {
+    SearchController(SearchService searchService) {
         this.searchService = searchService;
     }
 
-    /** Constraint violations → {@code HandlerMethodValidationException} → 400 (see {@code ApiExceptionHandler}). */
     @GetMapping
     public SearchResponse search(@RequestParam @NotBlank @Size(max = QuestionLimits.MAX_LENGTH) String question,
                                  @RequestParam(required = false) Product product) {
-        return searchService.search(question, product);
+        return searchService.search(question.strip(), product);
     }
 }
